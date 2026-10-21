@@ -51,4 +51,31 @@ app.use((err, req, res, next) =>
   })
 );
 
+
+
+app.get('/api/health', async (req, res) => {
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const state = states[mongoose.connection.readyState];
+
+  try {
+    // On serverless, the first request after a cold start may arrive
+    // before the connection is ready, so connect first if needed.
+    // (Replace with your own connect function if you have one.)
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000
+      });
+    }
+
+    // A real round trip to the database
+    await mongoose.connection.db.admin().ping();
+
+    res.json({ status: 'ok', db: 'connected', state });
+  } catch (e) {
+    console.error('DB health check failed:', e.message);
+    res.status(503).json({ status: 'error', db: 'unreachable', state });
+  }
+});
+
+
 module.exports = app;
